@@ -61,8 +61,10 @@ Structure:
 body → parent
 
 p → child
+```
+---
 
-Multiple Levels of Nesting
+## Multiple Levels of Nesting
 
 HTML elements can have multiple generations:
 
@@ -82,7 +84,10 @@ Example:
   </div>
 </body>
 
-Hierarchy diagram:
+---
+
+## Hierarchy diagram:
+
 body
  └── div
       └── p
@@ -108,7 +113,9 @@ Example HTML:
   </div>
 </body>
 
-Hierarchy diagram:
+---
+
+## Hierarchy diagram:
 
 body
  └── div
@@ -143,8 +150,11 @@ h1 and p are siblings
 
 Both are children of div
 
-Key Vocabulary
-Parent
+---
+
+## Key Vocabulary
+
+# Parent
 
 An element that contains other elements.
 
@@ -152,7 +162,9 @@ Example:
 
 <body>
 
-Child
+---
+
+# Child
 
 An element inside another element.
 
@@ -160,13 +172,17 @@ Example:
 
 <p>
 
-Sibling
+---
+
+# Sibling
 
 Elements that share the same parent.
 
 Example:
 
 <h1> and <p>
+
+---
 
 Descendant
 
@@ -180,21 +196,26 @@ body
 
 p is a descendant of body.
 
-Why HTML Structure Matters
+---
+
+## Why HTML Structure Matters
 
 HTML hierarchy is important because:
 
-Structure controls how content is organized
+-Structure controls how content is organized
 
-Child elements can inherit styles from parents
+-Child elements can inherit styles from parents
 
-CSS styling often depends on element hierarchy
+-CSS styling often depends on element hierarchy
 
-JavaScript often interacts with elements based on structure
+-JavaScript often interacts with elements based on structure
 
-You will see this used heavily when learning CSS and DOM manipulation.
+-You will see this used heavily when learning CSS and DOM manipulation.
 
-Key Pattern
+---
+
+
+# Key Pattern
 
 HTML structure often looks like this:
 
