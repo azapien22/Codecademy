@@ -34,17 +34,20 @@ List of heading elements:
     <h5>
     <h6>
 
+
 Hierarchy:
 
-```text
+```text 
 Largest
   h1
    h2
-    h3
+    h3i
      h4
       h5
        h6
 Smallest
+```
+---
 
 # Purpose of Each Heading
 
