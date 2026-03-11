@@ -77,21 +77,21 @@ Grandchild
 Great-grandchild
 
 Example:
-
+``` text
 <body>
   <div>
     <p>Hello</p>
   </div>
 </body>
-
+```
 ---
 
 ## Hierarchy diagram:
-
+``` text
 body
  └── div
       └── p
-
+```
 Relationships:
 
 body = parent of div
@@ -105,23 +105,23 @@ p = grandchild of body
 Example with Multiple Elements
 
 Example HTML:
-
+``` text
 <body>
   <div>
     <h1>Sibling to p, but also grandchild of body</h1>
     <p>Sibling to h1, but also grandchild of body</p>
   </div>
 </body>
-
+```
 ---
 
 ## Hierarchy diagram:
-
+``` text
 body
  └── div
       ├── h1
       └── p
-
+```
 Relationships:
 
 body → parent of div
@@ -134,16 +134,18 @@ p → child of div
 
 Because h1 and p share the same parent (div), they are siblings.
 
-Sibling Elements
+---
+
+## Sibling Elements
 
 Sibling elements are elements that share the same parent.
 
 Example:
-
+``` text
 div
  ├── h1
  └── p
-
+```
 Here:
 
 h1 and p are siblings
@@ -152,48 +154,48 @@ Both are children of div
 
 ---
 
-## Key Vocabulary
+# Key Vocabulary
 
-# Parent
+## Parent
 
 An element that contains other elements.
 
 Example:
-
+``` text
 <body>
-
+```
 ---
 
-# Child
+## Child
 
 An element inside another element.
 
 Example:
-
+``` text
 <p>
-
+```
 ---
 
-# Sibling
+## Sibling
 
 Elements that share the same parent.
 
 Example:
-
+``` text
 <h1> and <p>
-
+```
 ---
 
-Descendant
+## Descendant
 
 Any element inside another element.
 
 Example:
-
+``` text
 body
  └── div
       └── p
-
+```
 p is a descendant of body.
 
 ---
@@ -202,15 +204,15 @@ p is a descendant of body.
 
 HTML hierarchy is important because:
 
--Structure controls how content is organized
+- Structure controls how content is organized
 
--Child elements can inherit styles from parents
+- Child elements can inherit styles from parents
 
--CSS styling often depends on element hierarchy
+- CSS styling often depends on element hierarchy
 
--JavaScript often interacts with elements based on structure
+- JavaScript often interacts with elements based on structure
 
--You will see this used heavily when learning CSS and DOM manipulation.
+- You will see this used heavily when learning CSS and DOM manipulation.
 
 ---
 
