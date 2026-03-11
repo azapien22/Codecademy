@@ -219,11 +219,13 @@ HTML hierarchy is important because:
 
 HTML structure often looks like this:
 
+``` text
 parent
  ├── child
  ├── child
  │    └── grandchild
  └── child
+ ```    
 
  Example:
 
