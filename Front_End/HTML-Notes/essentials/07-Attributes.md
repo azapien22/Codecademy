@@ -34,7 +34,7 @@ Diagram:
     attribute name = attribute value
            |               |
            v               v
-         id="intro"
+          id        =   "intro"
 ```
 ---
 
