@@ -148,9 +148,9 @@ Diagram:
 Indicates that the heading describes a **row**.
 
 Example:
-
+```Text
     <th scope="row">Temperature</th>
-
+```
 Meaning:
 
     this heading applies to the row beside it.
