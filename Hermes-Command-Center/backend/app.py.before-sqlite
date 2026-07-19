@@ -1,0 +1,743 @@
+from pathlib import Path
+import asyncio
+import csv
+import io
+import os
+import platform
+import socket
+from datetime import datetime, timezone
+from typing import Literal
+from uuid import uuid4
+
+import httpx
+import psutil
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+HERMES_ENV_PATH = Path.home() / ".hermes" / ".env"
+
+load_dotenv(HERMES_ENV_PATH)
+
+HERMES_API_BASE_URL = "http://127.0.0.1:8642"
+HERMES_API_KEY = os.getenv("API_SERVER_KEY")
+
+app = FastAPI(
+    title="Hermes Command Center",
+    description="Local AI workstation monitoring and control dashboard.",
+    version="0.1.0",
+)
+
+app.mount(
+    "/static",
+    StaticFiles(directory=FRONTEND_DIR),
+    name="static",
+)
+
+MissionStatus = Literal[
+    "accepted",
+    "queued",
+    "running",
+    "stopping",
+    "completed",
+    "failed",
+    "cancelled",
+]
+
+
+class MissionRequest(BaseModel):
+    command: str = Field(
+        ...,
+        min_length=3,
+        max_length=4000,
+        description="Natural-language mission for Specterman_AI.",
+    )
+
+    mission_type: str = Field(
+        default="general",
+        min_length=1,
+        max_length=100,
+    )
+
+
+class MissionEvent(BaseModel):
+    timestamp: str
+    message: str
+    level: Literal["info", "success", "warning", "error"] = "info"
+
+
+class Mission(BaseModel):
+    id: str
+    command: str
+    mission_type: str
+    status: MissionStatus
+    created_at: str
+    updated_at: str
+    events: list[MissionEvent]
+
+    hermes_run_id: str | None = None
+    hermes_session_id: str | None = None
+    output: str | None = None
+    error: str | None = None
+
+
+missions: dict[str, Mission] = {}
+current_mission_id: str | None = None
+mission_tasks: dict[str, asyncio.Task] = {}
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def add_mission_event(
+    mission: Mission,
+    message: str,
+    level: Literal["info", "success", "warning", "error"] = "info",
+) -> None:
+    mission.events.append(
+        MissionEvent(
+            timestamp=utc_now(),
+            message=message,
+            level=level,
+        )
+    )
+
+    mission.updated_at = utc_now()
+
+
+def hermes_headers() -> dict[str, str]:
+    if not HERMES_API_KEY:
+        raise RuntimeError(
+            "API_SERVER_KEY was not loaded from ~/.hermes/.env."
+        )
+
+    return {
+        "Authorization": f"Bearer {HERMES_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+
+def mission_instructions(mission: Mission) -> str:
+    safety_rules = (
+        "You are executing a mission submitted through the "
+        "Specterman_AI Command Center. "
+        "Report a concise final result. "
+        "Do not delete files, alter critical system configuration, "
+        "install software, send messages, publish content, or perform "
+        "other destructive or irreversible actions unless the mission "
+        "explicitly authorizes that exact action."
+    )
+
+    type_instructions = {
+        "image-generation": (
+            "Use the existing local ComfyUI integration when image "
+            "generation is requested. Do not install models or modify "
+            "ComfyUI unless explicitly requested."
+        ),
+        "research": (
+            "Perform careful research and clearly distinguish confirmed "
+            "facts from assumptions."
+        ),
+        "coding": (
+            "Inspect the relevant project before modifying it. Preserve "
+            "existing behavior and report files changed."
+        ),
+        "system": (
+            "Prefer inspection and diagnostics before making changes. "
+            "Avoid destructive system actions without explicit approval."
+        ),
+        "document": (
+            "Create the requested document and report its exact output "
+            "location."
+        ),
+        "general": (
+            "Choose the most appropriate available tools for the task."
+        ),
+    }
+
+    return (
+        safety_rules
+        + " "
+        + type_instructions.get(
+            mission.mission_type,
+            type_instructions["general"],
+        )
+    )
+
+
+async def dispatch_mission_to_hermes(mission_id: str) -> None:
+    mission = missions.get(mission_id)
+
+    if mission is None:
+        return
+
+    mission.status = "queued"
+    add_mission_event(
+        mission,
+        "Preparing mission for Hermes dispatch.",
+        "info",
+    )
+
+    session_id = f"specterman-{mission.id}"
+    mission.hermes_session_id = session_id
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{HERMES_API_BASE_URL}/v1/runs",
+                headers=hermes_headers(),
+                json={
+                    "input": mission.command,
+                    "session_id": session_id,
+                    "instructions": mission_instructions(mission),
+                },
+            )
+
+            response.raise_for_status()
+            run_data = response.json()
+
+        run_id = run_data.get("run_id")
+
+        if not run_id:
+            raise RuntimeError(
+                "Hermes accepted the request but returned no run_id."
+            )
+
+        mission.hermes_run_id = run_id
+        mission.status = "running"
+
+        add_mission_event(
+            mission,
+            f"Hermes run started: {run_id}",
+            "success",
+        )
+
+        await monitor_hermes_run(mission_id)
+
+    except asyncio.CancelledError:
+        raise
+
+    except Exception as exc:
+        mission.status = "failed"
+        mission.error = str(exc)
+
+        add_mission_event(
+            mission,
+            f"Hermes dispatch failed: {exc}",
+            "error",
+        )
+
+
+async def monitor_hermes_run(mission_id: str) -> None:
+    mission = missions.get(mission_id)
+
+    if mission is None or not mission.hermes_run_id:
+        return
+
+    run_id = mission.hermes_run_id
+    previous_status: str | None = None
+
+    while True:
+        await asyncio.sleep(2)
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.get(
+                    f"{HERMES_API_BASE_URL}/v1/runs/{run_id}",
+                    headers=hermes_headers(),
+                )
+
+                response.raise_for_status()
+                run_data = response.json()
+
+        except asyncio.CancelledError:
+            raise
+
+        except Exception as exc:
+            mission.status = "failed"
+            mission.error = str(exc)
+
+            add_mission_event(
+                mission,
+                f"Unable to monitor Hermes run: {exc}",
+                "error",
+            )
+            return
+
+        hermes_status = run_data.get("status", "unknown")
+
+        if hermes_status != previous_status:
+            previous_status = hermes_status
+
+            if hermes_status not in {"completed", "failed", "cancelled"}:
+                add_mission_event(
+                    mission,
+                    f"Hermes run status: {hermes_status}.",
+                    "info",
+                )
+
+        if hermes_status in {"started", "queued", "running"}:
+            mission.status = "running"
+            mission.updated_at = utc_now()
+            continue
+
+        if hermes_status == "stopping":
+            mission.status = "stopping"
+            mission.updated_at = utc_now()
+            continue
+
+        if hermes_status == "completed":
+            mission.status = "completed"
+            mission.output = run_data.get("output")
+
+            add_mission_event(
+                mission,
+                "Hermes completed the mission successfully.",
+                "success",
+            )
+
+            if mission.output:
+                add_mission_event(
+                    mission,
+                    f"Result: {mission.output}",
+                    "success",
+                )
+
+            return
+
+        if hermes_status == "cancelled":
+            mission.status = "cancelled"
+
+            add_mission_event(
+                mission,
+                "Hermes confirmed that the mission was cancelled.",
+                "warning",
+            )
+            return
+
+        if hermes_status == "failed":
+            mission.status = "failed"
+
+            error_value = run_data.get("error")
+            mission.error = (
+                str(error_value)
+                if error_value
+                else "Hermes run failed."
+            )
+
+            add_mission_event(
+                mission,
+                f"Hermes mission failed: {mission.error}",
+                "error",
+            )
+            return
+
+        mission.status = "failed"
+        mission.error = (
+            f"Hermes returned an unexpected run status: "
+            f"{hermes_status}"
+        )
+
+        add_mission_event(
+            mission,
+            mission.error,
+            "error",
+        )
+        return
+
+
+def remove_finished_mission_task(
+    mission_id: str,
+) -> None:
+    mission_tasks.pop(mission_id, None)
+
+
+@app.get("/")
+async def dashboard() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/api/health")
+async def health() -> dict:
+    return {
+        "status": "online",
+        "service": "Hermes Command Center",
+        "version": "0.1.0",
+    }
+
+
+@app.get("/api/system")
+async def system_status() -> dict:
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+    boot_time = psutil.boot_time()
+
+    return {
+        "hostname": socket.gethostname(),
+        "operating_system": platform.platform(),
+        "cpu": {
+            "logical_cores": psutil.cpu_count(logical=True),
+            "physical_cores": psutil.cpu_count(logical=False),
+            "usage_percent": psutil.cpu_percent(interval=0.2),
+        },
+        "memory": {
+            "total_gb": round(memory.total / 1024**3, 2),
+            "available_gb": round(memory.available / 1024**3, 2),
+            "usage_percent": memory.percent,
+        },
+        "disk": {
+            "total_gb": round(disk.total / 1024**3, 2),
+            "free_gb": round(disk.free / 1024**3, 2),
+            "usage_percent": disk.percent,
+        },
+        "boot_time": boot_time,
+    }
+
+
+async def check_http_service(url: str) -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.get(url)
+
+        return {
+            "online": response.is_success,
+            "status_code": response.status_code,
+        }
+    except httpx.HTTPError as exc:
+        return {
+            "online": False,
+            "error": str(exc),
+        }
+
+
+@app.get("/api/services")
+async def services() -> dict:
+    comfyui = await check_http_service(
+        "http://127.0.0.1:8188/system_stats"
+    )
+    ollama = await check_http_service(
+        "http://127.0.0.1:11434/api/tags"
+    )
+
+    return {
+        "comfyui": comfyui,
+        "ollama": ollama,
+    }
+
+@app.get("/api/gpus")
+async def gpu_status() -> dict:
+    command = [
+        "nvidia-smi",
+        "--query-gpu="
+        "index,"
+        "name,"
+        "utilization.gpu,"
+        "memory.used,"
+        "memory.total,"
+        "temperature.gpu,"
+        "power.draw,"
+        "power.limit",
+        "--format=csv,noheader,nounits",
+    ]
+
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        stdout, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            return {
+                "online": False,
+                "gpus": [],
+                "error": stderr.decode().strip() or "nvidia-smi failed",
+            }
+
+        output = stdout.decode().strip()
+        reader = csv.reader(io.StringIO(output))
+
+        gpus = []
+
+        for row in reader:
+            if len(row) != 8:
+                continue
+
+            index = int(row[0].strip())
+            name = row[1].strip()
+            utilization = float(row[2].strip())
+            memory_used_mb = float(row[3].strip())
+            memory_total_mb = float(row[4].strip())
+            temperature_c = float(row[5].strip())
+            power_draw_w = parse_optional_number(row[6])
+            power_limit_w = parse_optional_number(row[7])
+
+            memory_percent = (
+                round((memory_used_mb / memory_total_mb) * 100, 1)
+                if memory_total_mb > 0
+                else 0
+            )
+
+            gpus.append(
+                {
+                    "index": index,
+                    "name": name,
+                    "utilization_percent": utilization,
+                    "memory": {
+                        "used_mb": memory_used_mb,
+                        "total_mb": memory_total_mb,
+                        "used_gb": round(memory_used_mb / 1024, 2),
+                        "total_gb": round(memory_total_mb / 1024, 2),
+                        "usage_percent": memory_percent,
+                    },
+                    "temperature_c": temperature_c,
+                    "power": {
+                        "draw_w": power_draw_w,
+                        "limit_w": power_limit_w,
+                    },
+                }
+            )
+
+        return {
+            "online": True,
+            "count": len(gpus),
+            "gpus": gpus,
+        }
+
+    except FileNotFoundError:
+        return {
+            "online": False,
+            "gpus": [],
+            "error": "nvidia-smi was not found.",
+        }
+    except Exception as exc:
+        return {
+            "online": False,
+            "gpus": [],
+            "error": str(exc),
+        }
+
+
+def parse_optional_number(value: str) -> float | None:
+    cleaned = value.strip()
+
+    if cleaned in {"N/A", "[N/A]", "Not Supported"}:
+        return None
+
+    try:
+        return round(float(cleaned), 1)
+    except ValueError:
+        return None
+
+
+@app.get("/api/hermes")
+async def hermes_status() -> dict:
+    url = "http://127.0.0.1:9119/api/status"
+
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+
+        data = response.json()
+        telegram = data.get("gateway_platforms", {}).get("telegram", {})
+
+        return {
+            "online": True,
+            "version": data.get("version"),
+            "release_date": data.get("release_date"),
+            "gateway": {
+                "running": data.get("gateway_running", False),
+                "state": data.get("gateway_state", "unknown"),
+                "pid": data.get("gateway_pid"),
+                "busy": data.get("gateway_busy", False),
+            },
+            "telegram": {
+                "state": telegram.get("state", "unknown"),
+                "connected": telegram.get("state") == "connected",
+                "error_message": telegram.get("error_message"),
+            },
+            "agents": {
+                "active": data.get("active_agents", 0),
+                "sessions": data.get("active_sessions", 0),
+            },
+            "profile": (
+                data.get("profiles", ["default"])[0]
+                if data.get("profiles")
+                else "default"
+            ),
+        }
+
+    except httpx.HTTPStatusError as exc:
+        return {
+            "online": False,
+            "error": f"Hermes returned HTTP {exc.response.status_code}",
+        }
+    except httpx.HTTPError as exc:
+        return {
+            "online": False,
+            "error": str(exc),
+        }
+    except ValueError:
+        return {
+            "online": False,
+            "error": "Hermes returned invalid JSON.",
+        }
+
+
+@app.post("/api/missions", status_code=201)
+async def create_mission(request: MissionRequest) -> Mission:
+    global current_mission_id
+
+    mission_id = str(uuid4())
+    timestamp = utc_now()
+
+    mission = Mission(
+        id=mission_id,
+        command=request.command.strip(),
+        mission_type=request.mission_type.strip() or "general",
+        status="accepted",
+        created_at=timestamp,
+        updated_at=timestamp,
+        events=[],
+    )
+
+    add_mission_event(
+        mission,
+        "Mission received by Specterman_AI Command Center.",
+        "success",
+    )
+
+    add_mission_event(
+        mission,
+        "Mission accepted and awaiting Hermes dispatch.",
+        "info",
+    )
+
+    missions[mission_id] = mission
+    current_mission_id = mission_id
+
+    task = asyncio.create_task(
+        dispatch_mission_to_hermes(mission_id)
+    )
+
+    mission_tasks[mission_id] = task
+
+    task.add_done_callback(
+        lambda _: remove_finished_mission_task(mission_id)
+    )
+
+    return mission
+
+
+@app.get("/api/missions/current")
+async def get_current_mission() -> Mission | None:
+    if current_mission_id is None:
+        return None
+
+    return missions.get(current_mission_id)
+
+
+@app.get("/api/missions/{mission_id}")
+async def get_mission(mission_id: str) -> Mission:
+    mission = missions.get(mission_id)
+
+    if mission is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Mission not found.",
+        )
+
+    return mission
+
+
+@app.get("/api/missions")
+async def list_missions() -> dict:
+    ordered_missions = sorted(
+        missions.values(),
+        key=lambda mission: mission.created_at,
+        reverse=True,
+    )
+
+    return {
+        "count": len(ordered_missions),
+        "missions": ordered_missions,
+    }
+
+
+@app.post("/api/missions/{mission_id}/cancel")
+async def cancel_mission(mission_id: str) -> Mission:
+    mission = missions.get(mission_id)
+
+    if mission is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Mission not found.",
+        )
+
+    if mission.status in {"completed", "failed", "cancelled"}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Mission is already {mission.status}.",
+        )
+
+    if not mission.hermes_run_id:
+        mission.status = "cancelled"
+
+        task = mission_tasks.get(mission_id)
+
+        if task and not task.done():
+            task.cancel()
+
+        add_mission_event(
+            mission,
+            "Mission cancelled before Hermes dispatch completed.",
+            "warning",
+        )
+
+        return mission
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                (
+                    f"{HERMES_API_BASE_URL}/v1/runs/"
+                    f"{mission.hermes_run_id}/stop"
+                ),
+                headers=hermes_headers(),
+            )
+
+            response.raise_for_status()
+
+        mission.status = "stopping"
+
+        add_mission_event(
+            mission,
+            "Cancellation requested. Waiting for Hermes to stop safely.",
+            "warning",
+        )
+
+        return mission
+
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Hermes rejected the cancellation request with "
+                f"HTTP {exc.response.status_code}."
+            ),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Unable to stop Hermes run: {exc}",
+        ) from exc

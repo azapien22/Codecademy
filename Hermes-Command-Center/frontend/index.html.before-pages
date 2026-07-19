@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+  <title>Specterman_AI Command Center</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">H</span>
+      <div>
+        <h1>Specterman_AI</h1>
+        <p>Command Center</p>
+      </div>
+    </div>
+
+    <nav>
+      <a class="active" href="#">Dashboard</a>
+      <a href="#">Hermes Agent</a>
+      <a href="#">Ollama</a>
+      <a href="#">ComfyUI</a>
+      <a href="#">Docker</a>
+      <a href="#">GPUs</a>
+      <a href="#">Workflows</a>
+      <a href="#">Settings</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">AI Workstation</p>
+        <h2>System Overview</h2>
+      </div>
+
+      <div class="connection">
+        <span id="connection-dot"></span>
+        <span id="connection-text">Connecting...</span>
+      </div>
+    </header>
+
+    <section class="mission-console">
+      <div class="mission-console-heading">
+        <div>
+          <p class="eyebrow">Specterman_AI Operations</p>
+          <h3>Mission Console</h3>
+        </div>
+
+        <div class="mission-console-state">
+          <span id="mission-console-dot"></span>
+          <span id="mission-console-label">Ready for mission</span>
+        </div>
+      </div>
+
+      <form id="mission-form">
+        <label for="mission-command">Mission instructions</label>
+
+        <textarea
+          id="mission-command"
+          name="command"
+          rows="4"
+          maxlength="4000"
+          placeholder="Describe the mission you want Specterman_AI to carry out..."
+          required
+        ></textarea>
+
+        <div class="mission-controls">
+          <div class="mission-type-field">
+            <label for="mission-type">Mission type</label>
+
+            <select id="mission-type" name="mission_type">
+              <option value="general">General</option>
+              <option value="image-generation">Image Generation</option>
+              <option value="research">Research</option>
+              <option value="coding">Coding</option>
+              <option value="system">System Administration</option>
+              <option value="document">Document Creation</option>
+            </select>
+          </div>
+
+          <div class="mission-actions">
+            <span id="mission-character-count">0 / 4000</span>
+
+            <button id="execute-mission-button" type="submit">
+              Execute Mission
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div id="mission-feedback" class="mission-feedback" hidden></div>
+    </section>
+
+    <section id="current-mission-panel" class="panel current-mission-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Active Operation</p>
+          <h3>Current Mission</h3>
+        </div>
+
+        <span id="current-mission-status" class="status pending">
+          No mission
+        </span>
+      </div>
+
+      <div id="mission-empty-state" class="mission-empty-state">
+        <p>No mission has been submitted during this server session.</p>
+      </div>
+
+      <div id="mission-content" class="mission-content" hidden>
+        <div class="mission-summary">
+          <div>
+            <p class="activity-label">Mission</p>
+            <h4 id="current-mission-command">—</h4>
+          </div>
+
+          <div class="mission-metadata">
+            <div>
+              <span>Type</span>
+              <strong id="current-mission-type">—</strong>
+            </div>
+
+            <div>
+              <span>Mission ID</span>
+              <strong id="current-mission-id">—</strong>
+            </div>
+
+            <div>
+              <span>Created</span>
+              <strong id="current-mission-created">—</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="mission-timeline-section">
+          <div class="mission-timeline-heading">
+            <h4>Mission Timeline</h4>
+
+            <button
+              id="cancel-mission-button"
+              class="secondary-button"
+              type="button"
+              hidden
+            >
+              Cancel Mission
+            </button>
+          </div>
+
+          <div id="mission-timeline" class="mission-timeline"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel mission-history-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Operations Archive</p>
+          <h3>Mission History</h3>
+        </div>
+
+        <div class="mission-history-controls">
+          <span id="mission-history-count">Loading missions...</span>
+
+          <button id="refresh-history-button" type="button">
+            Refresh History
+          </button>
+        </div>
+      </div>
+
+      <div id="mission-history-list" class="mission-history-list">
+        <div class="mission-history-empty">
+          Loading mission history...
+        </div>
+      </div>
+    </section>
+
+    <section class="status-grid">
+      <article class="card">
+        <p class="card-label">CPU usage</p>
+        <strong id="cpu-usage">--%</strong>
+        <p id="cpu-details">Loading...</p>
+      </article>
+
+      <article class="card">
+        <p class="card-label">Memory usage</p>
+        <strong id="memory-usage">--%</strong>
+        <p id="memory-details">Loading...</p>
+      </article>
+
+      <article class="card">
+        <p class="card-label">Disk usage</p>
+        <strong id="disk-usage">--%</strong>
+        <p id="disk-details">Loading...</p>
+      </article>
+
+      <article class="card">
+        <p class="card-label">Hostname</p>
+        <strong id="hostname">Loading...</strong>
+        <p>Ubuntu WSL2 workstation</p>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Local services</p>
+          <h3>AI Runtime Status</h3>
+        </div>
+
+        <button id="refresh-button" type="button">Refresh</button>
+      </div>
+
+      <div class="service-grid">
+        <article class="service">
+          <div>
+            <h4>ComfyUI</h4>
+            <p>Local image generation</p>
+          </div>
+          <span id="comfyui-status" class="status pending">Checking</span>
+        </article>
+
+        <article class="service">
+          <div>
+            <h4>Ollama</h4>
+            <p>Local language models</p>
+          </div>
+          <span id="ollama-status" class="status pending">Checking</span>
+        </article>
+
+        <article class="service hermes-service">
+          <div>
+            <h4>Hermes Agent</h4>
+            <p id="hermes-details">Checking gateway...</p>
+          </div>
+
+          <span id="hermes-status" class="status pending">
+            Checking
+          </span>
+        </article>
+
+        <article class="service">
+          <div>
+            <h4>Docker</h4>
+            <p>Container runtime</p>
+          </div>
+          <span class="status pending">Next phase</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel hermes-activity-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Agent Orchestration</p>
+          <h3>Hermes Activity</h3>
+        </div>
+
+        <div class="hermes-live-state">
+          <span id="hermes-activity-dot" class="activity-dot"></span>
+          <span id="hermes-activity-label">Checking Hermes...</span>
+        </div>
+      </div>
+
+      <div class="hermes-activity-grid">
+        <article class="activity-primary-card">
+          <div class="activity-primary-heading">
+            <div>
+              <p class="activity-label">Current State</p>
+              <h4 id="hermes-current-state">Connecting...</h4>
+            </div>
+
+            <span id="hermes-state-badge" class="status pending">
+              Checking
+            </span>
+          </div>
+
+          <div class="activity-animation" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+
+          <p id="hermes-state-description" class="activity-description">
+            Waiting for Hermes status information.
+          </p>
+        </article>
+
+        <article class="activity-stat-card">
+          <p class="activity-label">Active Agents</p>
+          <strong id="hermes-active-agents">--</strong>
+          <span>Currently executing</span>
+        </article>
+
+        <article class="activity-stat-card">
+          <p class="activity-label">Active Sessions</p>
+          <strong id="hermes-active-sessions">--</strong>
+          <span>Open Hermes sessions</span>
+        </article>
+
+        <article class="activity-stat-card">
+          <p class="activity-label">Telegram</p>
+          <strong id="hermes-telegram-state">--</strong>
+          <span>Gateway connection</span>
+        </article>
+
+        <article class="activity-stat-card">
+          <p class="activity-label">Gateway PID</p>
+          <strong id="hermes-gateway-pid">--</strong>
+          <span>Hermes gateway process</span>
+        </article>
+
+        <article class="activity-details-card">
+          <div class="activity-detail">
+            <span>Hermes version</span>
+            <strong id="hermes-version">--</strong>
+          </div>
+
+          <div class="activity-detail">
+            <span>Profile</span>
+            <strong id="hermes-profile">--</strong>
+          </div>
+
+          <div class="activity-detail">
+            <span>Gateway state</span>
+            <strong id="hermes-gateway-state">--</strong>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel gpu-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">NVIDIA Hardware</p>
+          <h3>GPU Fleet</h3>
+        </div>
+    
+        <div class="gpu-summary">
+          <span id="gpu-count">Detecting GPUs...</span>
+        </div>
+      </div>
+    
+      <div id="gpu-grid" class="gpu-grid">
+        <article class="gpu-card loading-card">
+          <p>Loading NVIDIA GPU information...</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
