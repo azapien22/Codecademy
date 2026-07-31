@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+  <title>Hermes Agent | Specterman_AI Command Center</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">H</span>
+      <div>
+        <h1>Specterman_AI</h1>
+        <p>Command Center</p>
+      </div>
+    </div>
+
+    <nav>
+      <a href="/">Dashboard</a>
+      <a class="active" href="/hermes-agent">Hermes Agent</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Hermes Agent</p>
+        <h2>Mission Operations</h2>
+      </div>
+    </header>
+
+    <section class="mission-console">
+      <div class="mission-console-heading">
+        <div>
+          <p class="eyebrow">Specterman_AI Operations</p>
+          <h3>Mission Console</h3>
+        </div>
+
+        <div class="mission-console-state">
+          <span id="mission-console-dot"></span>
+          <span id="mission-console-label">Ready for mission</span>
+        </div>
+      </div>
+
+      <form id="mission-form">
+        <label for="mission-command">Mission instructions</label>
+
+        <textarea
+          id="mission-command"
+          name="command"
+          rows="4"
+          maxlength="4000"
+          placeholder="Describe the mission you want Specterman_AI to carry out..."
+          required
+        ></textarea>
+
+        <div class="mission-controls">
+          <div class="mission-type-field">
+            <label for="mission-type">Mission type</label>
+
+            <select id="mission-type" name="mission_type">
+              <option value="general">General</option>
+              <option value="image-generation">Image Generation</option>
+              <option value="research">Research</option>
+              <option value="coding">Coding</option>
+              <option value="system">System Administration</option>
+              <option value="document">Document Creation</option>
+            </select>
+          </div>
+
+          <div class="mission-actions">
+            <span id="mission-character-count">0 / 4000</span>
+
+            <button id="execute-mission-button" type="submit">
+              Execute Mission
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div id="mission-feedback" class="mission-feedback" hidden></div>
+    </section>
+
+    <section id="current-mission-panel" class="panel current-mission-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Active Operation</p>
+          <h3>Current Mission</h3>
+        </div>
+
+        <span id="current-mission-status" class="status pending">
+          No mission
+        </span>
+      </div>
+
+      <div id="mission-empty-state" class="mission-empty-state">
+        <p>No mission has been submitted during this server session.</p>
+      </div>
+
+      <div id="mission-content" class="mission-content" hidden>
+        <div class="mission-summary">
+          <div>
+            <p class="activity-label">Mission</p>
+            <h4 id="current-mission-command">—</h4>
+          </div>
+
+          <div class="mission-metadata">
+            <div>
+              <span>Type</span>
+              <strong id="current-mission-type">—</strong>
+            </div>
+
+            <div>
+              <span>Mission ID</span>
+              <strong id="current-mission-id">—</strong>
+            </div>
+
+            <div>
+              <span>Created</span>
+              <strong id="current-mission-created">—</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="mission-timeline-section">
+          <div class="mission-timeline-heading">
+            <h4>Mission Timeline</h4>
+
+            <button
+              id="cancel-mission-button"
+              class="secondary-button"
+              type="button"
+              hidden
+            >
+              Cancel Mission
+            </button>
+          </div>
+
+          <div id="mission-timeline" class="mission-timeline"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel mission-history-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Operations Archive</p>
+          <h3>Mission History</h3>
+        </div>
+
+        <div class="mission-history-controls">
+          <span id="mission-history-count">Loading missions...</span>
+
+          <button id="refresh-history-button" type="button">
+            Refresh History
+          </button>
+        </div>
+      </div>
+
+      <div id="mission-history-list" class="mission-history-list">
+        <div class="mission-history-empty">
+          Loading mission history...
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/static/js/hermes-agent.js"></script>
+</body>
+</html>

@@ -3,14 +3,14 @@ import unittest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-INDEX_HTML = PROJECT_ROOT / "frontend" / "index.html"
-DASHBOARD_JS = PROJECT_ROOT / "frontend" / "js" / "dashboard.js"
+HERMES_AGENT_HTML = PROJECT_ROOT / "frontend" / "hermes-agent.html"
+HERMES_AGENT_JS = PROJECT_ROOT / "frontend" / "js" / "hermes-agent.js"
 STYLES_CSS = PROJECT_ROOT / "frontend" / "css" / "styles.css"
 
 
 class MissionHistoryFrontendContractTests(unittest.TestCase):
-    def test_dashboard_exposes_mission_history_controls(self) -> None:
-        html = INDEX_HTML.read_text(encoding="utf-8")
+    def test_hermes_agent_page_exposes_mission_history_controls(self) -> None:
+        html = HERMES_AGENT_HTML.read_text(encoding="utf-8")
 
         self.assertIn('class="panel mission-history-panel"', html)
         self.assertIn('class="mission-history-controls"', html)
@@ -19,8 +19,8 @@ class MissionHistoryFrontendContractTests(unittest.TestCase):
         self.assertIn('id="mission-history-list"', html)
         self.assertIn('class="mission-history-empty"', html)
 
-    def test_dashboard_loads_and_renders_persistent_mission_history(self) -> None:
-        javascript = DASHBOARD_JS.read_text(encoding="utf-8")
+    def test_hermes_agent_page_loads_persistent_mission_history(self) -> None:
+        javascript = HERMES_AGENT_JS.read_text(encoding="utf-8")
 
         self.assertIn('fetch("/api/missions")', javascript)
         self.assertIn("function missionStatusClass", javascript)
@@ -29,7 +29,7 @@ class MissionHistoryFrontendContractTests(unittest.TestCase):
         self.assertIn("loadMissionHistory()", javascript)
 
     def test_history_entries_open_the_selected_persistent_mission(self) -> None:
-        javascript = DASHBOARD_JS.read_text(encoding="utf-8")
+        javascript = HERMES_AGENT_JS.read_text(encoding="utf-8")
 
         self.assertIn("async function openMissionFromHistory", javascript)
         self.assertIn("encodeURIComponent(missionId)", javascript)

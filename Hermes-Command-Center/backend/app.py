@@ -573,6 +573,11 @@ async def dashboard() -> FileResponse:
     return FileResponse(FRONTEND_DIR / "index.html")
 
 
+@app.get("/hermes-agent")
+async def hermes_agent_page() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "hermes-agent.html")
+
+
 @app.get("/api/health")
 async def health() -> dict:
     return {
