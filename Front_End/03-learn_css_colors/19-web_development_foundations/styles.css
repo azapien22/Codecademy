@@ -1,0 +1,121 @@
+/* Universal styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: seashell;
+  color: midnightblue;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.6;
+}
+
+/* Header */
+.site-header {
+  padding: 48px 20px;
+  background-color: midnightblue;
+  color: white;
+  text-align: center;
+}
+
+.site-header h1 {
+  margin: 0 0 10px;
+  font-size: 2.5rem;
+}
+
+.site-header p {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* Main content */
+main {
+  width: 90%;
+  max-width: 1000px;
+  margin: 40px auto;
+}
+
+section {
+  margin-bottom: 48px;
+}
+
+h2 {
+  border-bottom: 4px solid darkcyan;
+  padding-bottom: 8px;
+  color: darkslateblue;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  box-shadow: 0 4px 12px lightgray;
+}
+
+th,
+td {
+  border: 1px solid slategray;
+  padding: 14px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background-color: darkcyan;
+  color: white;
+  letter-spacing: 0.03em;
+}
+
+tbody tr:nth-child(even) {
+  background-color: aliceblue;
+}
+
+tbody tr:hover {
+  background-color: lightcyan;
+}
+
+/* Inline code */
+code {
+  border-radius: 4px;
+  background-color: lavender;
+  color: darkred;
+  padding: 3px 7px;
+  font-family: "Courier New", Courier, monospace;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+/* Footer */
+footer {
+  padding: 24px;
+  background-color: midnightblue;
+  color: white;
+  text-align: center;
+}
+
+footer p {
+  margin: 0;
+}
+
+/* Small-screen layout */
+@media only screen and (max-width: 650px) {
+  .site-header h1 {
+    font-size: 2rem;
+  }
+
+  main {
+    width: 96%;
+  }
+
+  th,
+  td {
+    padding: 9px;
+    font-size: 0.9rem;
+  }
+
+  code {
+    white-space: normal;
+  }
+}
